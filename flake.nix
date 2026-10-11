@@ -67,6 +67,9 @@
 
         devShells.default = pkgs.mkShell {
           packages = [ nodejs pnpm ];
+          # The biome binary npm ships is linked for generic Linux and will not
+          # start on NixOS; `pnpm lint` uses this one instead.
+          BIOME_BINARY = "${pkgs.biome}/bin/biome";
         };
       });
 }

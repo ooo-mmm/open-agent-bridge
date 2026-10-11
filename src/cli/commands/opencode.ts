@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -75,7 +75,10 @@ export function registerOpenCodeCommand(program: Command): void {
 
       const srcPlugin = join(sourceDir, "agent-bridge.ts");
       const destPlugin = join(pluginDir, "agent-bridge.ts");
-      copyFileSync(srcPlugin, destPlugin);
+      // Copy contents, not mode: a read-only install (e.g. the Nix store) would
+      // otherwise leave a read-only plugin that blocks the next install.
+      rmSync(destPlugin, { force: true });
+      writeFileSync(destPlugin, readFileSync(srcPlugin));
       console.log(chalk.green("✓") + ` Copied plugin to ${destPlugin}`);
 
       // 3. Copy package.json (for bun install to resolve ws dependency)

@@ -166,7 +166,8 @@ export const AgentBridgePlugin = async (ctx: any) => {
 
   async function resolveSession(): Promise<string | null> {
     try {
-      const sessions = await ctx.client.session.list();
+      // The SDK client wraps responses as { data, error }.
+      const sessions = (await ctx.client.session.list())?.data;
       if (Array.isArray(sessions) && sessions.length > 0) {
         return sessions[sessions.length - 1].id as string;
       }
@@ -181,11 +182,11 @@ export const AgentBridgePlugin = async (ctx: any) => {
     const sid = sessionId ?? await resolveSession();
     if (!sid) return false;
     try {
-      await ctx.client.session.prompt_async({
-        id: sid,
-        parts: [{ type: "text", text: buildPrompt(msg) }],
-        noReply: false,
+      const res = await ctx.client.session.promptAsync({
+        path: { id: sid },
+        body: { parts: [{ type: "text", text: buildPrompt(msg) }], noReply: false },
       });
+      if (res?.error) return false;
       injected.add(msg.messageId);
       await ack(msg.conversationId, msg.messageId, "displayed_to_client", "Plugin injected via prompt_async");
       return true;
@@ -275,10 +276,14 @@ export const AgentBridgePlugin = async (ctx: any) => {
 
   // ── Startup ─────────────────────────────────────────────────────────────────
 
-  sessionId = await resolveSession();
   await register();
   connect();
-  await resync();
+  // Not awaited: the client calls back into OpenCode's own server, which does
+  // not answer until every plugin has finished loading.
+  void (async () => {
+    sessionId = sessionId ?? await resolveSession();
+    await resync();
+  })();
 
   setInterval(async () => { await resync(); await drain(); }, RESYNC_MS);
   setInterval(
